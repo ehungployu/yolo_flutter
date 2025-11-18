@@ -11,7 +11,23 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
-assets/modelss/
+# Model files (too large for git)
+assets/models/*.tflite
+assets/models/*.mlpackage
+assets/models/*.mlpackage/
+assets/models/**/*.bin
+assets/models/**/weight.bin
+assets/models/**/model.mlmodel
+
+# iOS model files
+ios/Runner/*.mlpackage
+ios/Runner/*.mlpackage/
+ios/Runner/**/*.bin
+ios/Runner/**/weight.bin
+ios/Runner/**/model.mlmodel
+
+# Keep the directory structure
+!assets/models/.gitkeep
 
 # IntelliJ related
 *.iml

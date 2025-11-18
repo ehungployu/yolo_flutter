@@ -3,10 +3,8 @@ import 'package:ultralytics_yolo/yolo.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:ultralytics_yolo/yolo_view.dart';
-import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
-
 
 void main() => runApp(const MaterialApp(home: TestYOLO()));
 
@@ -19,32 +17,48 @@ class TestYOLO extends StatefulWidget {
 
 class _TestYOLOState extends State<TestYOLO> {
   String? _message;
-  // String modelPath = 'yolo11n';
-  // String modelPath = 'assets/models/yolo11x';
-  // String modelPath = 'assets/models/yolo11x.mlpackage';
-  String modelPath = '../assets/models/yolo11x.tflite';
 
+  // Use mlpackage on iOS, tflite on Android
+  String get modelPath {
+    if (Platform.isIOS) {
+      return 'yolo11x'; // CoreML model name (without extension) - must be in bundle
+    } else {
+      return 'assets/models/yolo11x.tflite'; // TFLite for Android
+    }
+  }
 
   // In your initState or build method:
   Future<void> checkAsset() async {
     try {
-      final manifestContent = await rootBundle.loadString('AssetManifest.json');
-      print('Asset Manifest: $manifestContent');
-      
-      // Try to load the model file directly
-      final data = await rootBundle.load(modelPath);
-      print('Model file size: ${data.buffer.lengthInBytes} bytes');
+      if (Platform.isIOS) {
+        // For iOS, use CoreML model directly from bundle
+        // WORKAROUND: Use multi-instance to avoid the default channel bug in 0.1.39
+        final yolo = YOLO(
+          modelPath: modelPath,
+          task: YOLOTask.detect,
+          useGpu: false,
+          useMultiInstance: true,
+        );
+        await yolo.loadModel();
+        setState(() => _message = '✅ YOLO CoreML model loaded successfully!');
+      } else {
+        // For Android, load tflite from assets
+        final data = await rootBundle.load(modelPath);
+        final f = File(
+          '${(await getTemporaryDirectory()).path}/yolo11x.tflite',
+        );
+        await f.writeAsBytes(data.buffer.asUint8List());
 
-      final f = File('${(await getTemporaryDirectory()).path}/yolo11x.tflite');
-      print('run f');
-      await f.writeAsBytes(data.buffer.asUint8List());
-      print('run writeAsBytes');
-      final yolo = YOLO(modelPath: f.path, task: YOLOTask.detect, useGpu: false);
-      print('add yolo');
-      await yolo.loadModel();
-      print('yolo.loadModel');
+        final yolo = YOLO(
+          modelPath: f.path,
+          task: YOLOTask.detect,
+          useGpu: false,
+        );
+        await yolo.loadModel();
+        setState(() => _message = '✅ YOLO TFLite model loaded successfully!');
+      }
     } catch (e) {
-      print('Error loading asset: $e');
+      setState(() => _message = '❌ Error: $e');
     }
   }
 
@@ -77,10 +91,10 @@ class _TestYOLOState extends State<TestYOLO> {
                 //       const SnackBar(content: Text('YOLO plugin working!')),
                 //     );
                 //   }
-                  
+
                 //   var imageData = (await rootBundle.load('assets/images/dog.jpg')).buffer.asUint8List();
                 //   var testResult = await yolo.predict(imageData);
-                  
+
                 //   setState(() => _message = testResult.toString());
                 // } catch (e) {
                 //   setState(() => _message = '❌ Error: $e');
@@ -117,7 +131,15 @@ class YOLODemo extends StatefulWidget {
 }
 
 class _YOLODemoState extends State<YOLODemo> {
-  final String modelPath = 'yolo11n';
+  // Use mlpackage on iOS, tflite on Android
+  String get modelPath {
+    if (Platform.isIOS) {
+      return 'yolo11x'; // CoreML model name for iOS
+    } else {
+      return 'yolo11n'; // Default model for Android
+    }
+  }
+
   File? selectedImage;
   List<dynamic> results = [];
   bool isLoading = false;
@@ -131,10 +153,7 @@ class _YOLODemoState extends State<YOLODemo> {
         useGpu: false,
         task: YOLOTask.detect,
         onResult: (results) {
-          print('Found ${results.length} objects!');
-          for (final result in results) {
-            print('${result.className}: ${result.confidence}');
-          }
+          // Results are available here for processing
         },
       ),
       floatingActionButton: FloatingActionButton(
@@ -152,6 +171,7 @@ class _YOLODemoState extends State<YOLODemo> {
             modelPath: modelPath,
             task: YOLOTask.detect,
             useGpu: false,
+            useMultiInstance: true,
           );
           await yolo.loadModel();
 
